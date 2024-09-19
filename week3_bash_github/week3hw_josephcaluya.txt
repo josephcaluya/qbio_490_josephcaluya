@@ -1,0 +1,45 @@
+pwd: prints out the current folder/directory you're in
+mkdir: creates a new folder
+cd <dir>: allows you to enter into the folder called <dir> through a relative or
+absolute path
+cd .. : allows you to enter the parent folder of the folder you're currently
+in (i.e. the folder just before)
+ls: prints out the contents of the folder you're currently in
+rm and the -r flag: deletes specified file (-r indicates you want to delete
+a folder); cannot be undone
+cat: allows you to view the contents of, combine, or create one or multiple
+files
+head: lets you view the first 10 lines of a file
+tail: lets you view the last 10 lines of a file
+scp: copies a file or folder to another directory (use -r for copying folders)
+nano (including Ctrl+o and Ctrl+x): opens up Nano; creates/edits a file and displays
+contents in Nano to allow you to edit file contents. Ctrl+o lets you save and name a
+file, and Ctrl+x closes Nano.
+--help: allows you to get more information about a command
+TAB: allows you to auto complete commands/file names
+Ctrl+a: allows you to move to the beginning of a line
+Ctrl+e: allows you to move to the end of a line
+Ctrl+r: allows you to search through your command history (i.e. you can see commands
+you entered up to the current point from most recent to least recent)
+Ctrl+k: allows you to delete characters after the cursor to the end of the line
+Ctrl+u: allows you to delete characters before the cursor to the beginning of the
+line
+Ctrl+l: clears the screen of the terminal
+
+To navigate to my Desktop from /Users/ using an absolute path:
+cd /Users/josephcaluya/Desktop
+Using a relative path:
+cd josephcaluya/Desktop
+
+To copy /Desktop/Example Folder/ with multiple documents inside to /Documents/:
+scp -r /Users/josephcaluya/Desktop/Example Folder /Users/josephcaluya/Documents
+
+If you didn't know which folder you were in, you would navigate back to
+/Documents/ by using pwd to print the current directory, then using cd ../ ... as many
+times as needed until you get to Documents.
+
+Fill in the blank:
+1. git status
+2. git add
+3. git commit
+4. git push
