@@ -17,15 +17,47 @@ In this assignment, you will need to use your skills learned in class to demonst
 
 *Pre-Assignment*
 Load all necessary packages, read in the clinical data.csv file you have in your analysis_data folder, and instantiate the MAF_object.
-```{r}
 
+```{r setup}
+    knitr::opts_knit$set(root.dir = normalizePath("/home1/jcaluya/490_cluster/analysis_data")) 
+```
+
+
+```{r}
+library(maftools)
+library(TCGAbiolinks)
+library(ggplot2)
+library(BiocManager)
+clinical <- read.csv("/home1/jcaluya/490_cluster/analysis_data/brca_clinical_data.csv")
+maf_query <- GDCquery(
+  project = 'TCGA-BRCA',
+  data.category = "Simple Nucleotide Variation",
+  access = "open",
+  data.type = "Masked Somatic Mutation",
+  workflow.type = "Aliquot Ensemble Somatic Variant Merging and Masking"
+)
+
+#GDCdownload(maf_query)
+
+maf <- GDCprepare(maf_query) # as long as it runs, ignore any errors
+
+maf_object <- read.maf(maf = maf,
+                       clinicalData = clinical, 
+                       isTCGA = TRUE)
 ```
 
 
 *1*
 Choose a clinical variable (or any variable from clin_rad or clin_drug) to separate your populations into two different groups and rewrite the column or create a new column with that variable as a factor. ***Do not use age or vital_status as your clinical variable.*** Hint: if your variable is continuous, you will need to determine your own cutoffs for the different levels of the factor. If your variable is categorical and has more than two possible values, choose the two that are the most common.
 ```{r}
-
+maf_object@clinical.data$race <- factor(maf_object@clinical.data$race)
+raceWhite_mask <- ifelse(maf_object@clinical.data$race == 'WHITE', TRUE, FALSE)
+white_patient_barcodes <- maf_object@clinical.data$Tumor_Sample_Barcode[raceWhite_mask]
+white_maf <- subsetMaf(maf = maf_object,
+                       tsb = white_patient_barcodes)
+raceBlack_mask <- ifelse(maf_object@clinical.data$race == 'BLACK OR AFRICAN AMERICAN', TRUE, FALSE)
+black_patient_barcodes <- maf_object@clinical.data$Tumor_Sample_Barcode[raceBlack_mask]
+black_maf <- subsetMaf(maf = maf_object, tsb = black_patient_barcodes)
 ```
 
 
@@ -33,7 +65,9 @@ Choose a clinical variable (or any variable from clin_rad or clin_drug) to separ
 Create a co-oncoplot with the top 10-20 (you choose) most mutated genes for the two groups. Pick one that has a large discrepancy in % mutated or type of mutations between the groups and research it. 
 Research it. What is the gene used for? Can you think of any reason for the discrepancy?
 ```{r}
+coOncoplot(m1 = white_maf, m2 = black_maf, m1Name = "White Patients", m2Name = "Black Patients", borderCol = NA)
 
+# PIK3CA is a gene that provides instructions for making the p110 alpha protein, which is important for cellular functions such as growth, division, and survival. Mutations can cause the enzyme to become overactive, which can cause cancer cell growth. The discrepancy could be caused by environmental factors/access to healthcare or certain populations having higher genetic predispositions to mutations in this gene.
 ```
 
 
@@ -41,7 +75,19 @@ Research it. What is the gene used for? Can you think of any reason for the disc
 Create a contingency table with your variable and chosen gene. Run a Fisher’s Exact Test between presence of mutations for that gene and your clinical variable. Create and save a mosaic plot. 
 Interpret the output of the Fisher’s Exact Test in terms of the odds ratio and p-value.
 ```{r}
+pik3ca <- maf_object@data[maf_object@data$Hugo_Symbol == "PIK3CA"]
+maf_object@clinical.data$has_pik3ca_mutation <- ifelse(maf_object@clinical.data$Tumor_Sample_Barcode %in% pik3ca$Tumor_Sample_Barcode, "Has Mutation", "No Mutation")
+maf_object@clinical.data$has_pik3ca_mutation <- factor(maf_object@clinical.data$has_pik3ca_mutation)
+maf_object@clinical.data$is_white_or_black_patient <- ifelse(maf_object@clinical.data$race == "WHITE", "White", ifelse(maf_object@clinical.data$race == "BLACK OR AFRICAN AMERICAN", "Black", NA))
+maf_object@clinical.data$is_white_or_black_patient <- factor(maf_object@clinical.data$is_white_or_black_patient)
+contig <- table(maf_object@clinical.data$is_white_or_black_patient, maf_object@clinical.data$has_pik3ca_mutation)
+mosaicplot(contig)
+fisher_test <- fisher.test(contig)
+fisher_test
+fisher_test$p.value
+ggsave("/home1/jcaluya/490_cluster/analysis_data/contig.png")
 
+# The odds ratio suggests that there is a 0.53x chance a mutation will occur in Black patients compared to White patients. The p-value is fairly significant since it is less than 0.05; the difference in PIK3CA mutation frequencies between the two racial groups is statistically significant, and race may play a role in the likelihood of having a mutation in this gene.
 ```
 
 
@@ -49,7 +95,12 @@ Interpret the output of the Fisher’s Exact Test in terms of the odds ratio and
 Subset your maf_object based on your chosen clinical variable and create a co-lollipop plot of your chosen gene divided between the two different clinical variable possibilities. Include descriptive names on your plot.
 Do you notice any difference in terms of mutations (e.g. sites, types, number) between the two populations?
 ```{r}
-
+lollipopPlot2(m1 = white_maf, 
+              m2 = black_maf, 
+              m1_name = 'White Patients',
+              m2_name = 'Black Patients',
+              gene = 'PIK3CA')
+# While some areas of the gene had mutations that appeared in both populations, White patients appeared to have a greater number of mutations and more mutations spread throughout different locations of the gene. More in-frame deletions appeared in the White population as well.
 ```
 
 
@@ -57,5 +108,15 @@ Do you notice any difference in terms of mutations (e.g. sites, types, number) b
 Create your Overall_Survival_Status column and create a mafSurvival KM plot based on mutations in your chosen gene.
 Does there seem to be a difference? Hypothesize why or not based on the other analysis you did with the gene above.
 ```{r}
+maf_object@clinical.data$Overall_Survival_Status <- ifelse(maf_object@clinical.data$vital_status == "Dead", maf_object@clinical.data$death_days_to, maf_object@clinical.data$last_contact_days_to)
 
+maf_object@clinical.data$death_event <- maf_object@clinical.data$vital_status == "Dead"
+
+mafSurvival(maf = maf_object,
+            genes = "PIK3CA",
+            time = "Overall_Survival_Status",
+            Status = "death_event",
+            isTCGA = TRUE)
+
+# There does not seem to be a statistically significant difference in survival rates between PIK3CA mutant and wild-type patients since the p-value is 0.586. Other factors such as co-mutations in other genes may be impacting survival more than just PIK3CA mutations alone.
 ```
